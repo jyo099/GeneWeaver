@@ -1,0 +1,33 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Environment variables & secrets
+.env
+.env.local
+.env.*.local
+
+# Genomic datasets & large binary caches
+*.fasta
+*.fa
+*.fastq
+*.fq
+*.gz
+*.npy
+data/raw/
+data/indices/
+
+# Testing & linting caches
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE settings
+.vscode/
+.idea/
