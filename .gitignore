@@ -31,3 +31,5 @@ htmlcov/
 # IDE settings
 .vscode/
 .idea/
+# Python package build files
+*.egg-info/
