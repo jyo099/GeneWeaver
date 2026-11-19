@@ -1,4 +1,3 @@
-
 """
 GeneWeaver - Main Application
 
@@ -17,7 +16,6 @@ from fastapi.responses import HTMLResponse
 from app.api.v1.endpoints.health import health_check
 from app.api.v1.router import api_router
 from app.core.config import Settings, get_settings
-
 
 logger = logging.getLogger("geneweaver")
 
@@ -56,11 +54,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ]
 
         if not is_production:
-            endpoints.extend([
-                ("Swagger Documentation", "/docs"),
-                ("ReDoc Documentation", "/redoc"),
-                ("OpenAPI Schema", "/openapi.json"),
-            ])
+            endpoints.extend(
+                [
+                    ("Swagger Documentation", "/docs"),
+                    ("ReDoc Documentation", "/redoc"),
+                    ("OpenAPI Schema", "/openapi.json"),
+                ]
+            )
 
         for name, path in endpoints:
             logger.info("%-25s http://127.0.0.1:8000%s", name, path)
@@ -147,11 +147,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ]
 
         if not is_production:
-            endpoints.extend([
-                ("Swagger UI", "/docs", "Interactive API documentation"),
-                ("ReDoc", "/redoc", "Alternative API documentation"),
-                ("OpenAPI JSON", "/openapi.json", "API specification"),
-            ])
+            endpoints.extend(
+                [
+                    ("Swagger UI", "/docs", "Interactive API documentation"),
+                    ("ReDoc", "/redoc", "Alternative API documentation"),
+                    ("OpenAPI JSON", "/openapi.json", "API specification"),
+                ]
+            )
 
         endpoint_html = ""
 

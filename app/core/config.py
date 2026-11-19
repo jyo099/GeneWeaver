@@ -1,4 +1,3 @@
-
 """
 GeneWeaver - Central Application Configuration
 
@@ -52,8 +51,7 @@ class Settings(BaseSettings):
     # --------------------------------------------------
 
     database_url: str = (
-        "postgresql+psycopg://geneweaver:change-me"
-        "@localhost:5432/geneweaver"
+        "postgresql+psycopg://geneweaver:change-me" "@localhost:5432/geneweaver"
     )
 
     # --------------------------------------------------
@@ -89,11 +87,7 @@ class Settings(BaseSettings):
 
     api_prefix: str = "/api/v1"
 
-    cors_origins: list[str] = Field(
-        default_factory=lambda: [
-            "http://localhost:3000"
-        ]
-    )
+    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
 
     @field_validator("app_name", "app_version")
     @classmethod

@@ -1,4 +1,3 @@
-
 """
 GeneWeaver Health Endpoint.
 
@@ -26,7 +25,3 @@ async def health_check(request: Request) -> dict:
         "service": settings.app_name,
         "version": settings.app_version,
     }
-
-
-
-
