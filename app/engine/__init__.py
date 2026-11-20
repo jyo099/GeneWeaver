@@ -18,6 +18,14 @@ from app.engine.backend import (
 
 from app.engine.device_manager import DeviceManager
 
+from app.engine.hamming import (
+    HammingDistanceEngine,
+    HammingDistanceError,
+    InvalidSequenceError,
+    SequenceLengthMismatchError,
+    hamming_distance,
+    batch_hamming_distance,
+)
 
 __all__ = [
     "ComputeBackend",
@@ -30,4 +38,10 @@ __all__ = [
     "DeviceOperationError",
     "CPUBackend",
     "CUDABackend",
+    "HammingDistanceEngine",
+    "HammingDistanceError",
+    "InvalidSequenceError",
+    "SequenceLengthMismatchError",
+    "hamming_distance",
+    "batch_hamming_distance",
 ]
