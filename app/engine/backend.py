@@ -1,4 +1,3 @@
-
 """CPU and CUDA compute backend implementations."""
 
 from __future__ import annotations
@@ -7,10 +6,10 @@ from typing import Any
 
 from app.engine.device import (
     DeviceInfo,
-    DeviceType,
-    DeviceUnavailableError,
     DeviceInitializationError,
     DeviceOperationError,
+    DeviceType,
+    DeviceUnavailableError,
 )
 
 
@@ -46,7 +45,7 @@ class CPUBackend:
     def synchronize(self) -> None:
         """CPU operations execute synchronously."""
 
-        return None
+        return
 
 
 class CUDABackend:
@@ -58,9 +57,7 @@ class CUDABackend:
         cupy_module: Any | None = None,
     ) -> None:
         if device_id < 0:
-            raise ValueError(
-                "CUDA device ID cannot be negative."
-            )
+            raise ValueError("CUDA device ID cannot be negative.")
 
         self._device_id = device_id
 
@@ -91,14 +88,10 @@ class CUDABackend:
         """Verify CUDA availability and activate the requested device."""
 
         try:
-            device_count = (
-                self._cupy.cuda.runtime.getDeviceCount()
-            )
+            device_count = self._cupy.cuda.runtime.getDeviceCount()
 
             if device_count <= 0:
-                raise DeviceUnavailableError(
-                    "No CUDA-compatible GPU was detected."
-                )
+                raise DeviceUnavailableError("No CUDA-compatible GPU was detected.")
 
             if self._device_id >= device_count:
                 raise DeviceUnavailableError(
@@ -107,17 +100,14 @@ class CUDABackend:
                 )
 
             with self._cupy.cuda.Device(self._device_id):
-                self._cupy.cuda.runtime.getDeviceProperties(
-                    self._device_id
-                )
+                self._cupy.cuda.runtime.getDeviceProperties(self._device_id)
 
         except DeviceUnavailableError:
             raise
 
         except Exception as exc:
             raise DeviceInitializationError(
-                f"Failed to initialize CUDA device "
-                f"{self._device_id}: {exc}"
+                f"Failed to initialize CUDA device {self._device_id}: {exc}"
             ) from exc
 
     def get_device_info(self) -> DeviceInfo:
@@ -125,15 +115,11 @@ class CUDABackend:
 
         try:
             with self._cupy.cuda.Device(self._device_id):
-                properties = (
-                    self._cupy.cuda.runtime.getDeviceProperties(
-                        self._device_id
-                    )
+                properties = self._cupy.cuda.runtime.getDeviceProperties(
+                    self._device_id
                 )
 
-                free_memory, total_memory = (
-                    self._cupy.cuda.runtime.memGetInfo()
-                )
+                free_memory, total_memory = self._cupy.cuda.runtime.memGetInfo()
 
             name = properties.get(
                 "name",
@@ -156,8 +142,7 @@ class CUDABackend:
 
         except Exception as exc:
             raise DeviceOperationError(
-                "Unable to retrieve CUDA device information: "
-                f"{exc}"
+                f"Unable to retrieve CUDA device information: {exc}"
             ) from exc
 
     def synchronize(self) -> None:
@@ -168,6 +153,4 @@ class CUDABackend:
                 self._cupy.cuda.Stream.null.synchronize()
 
         except Exception as exc:
-            raise DeviceOperationError(
-                f"CUDA synchronization failed: {exc}"
-            ) from exc
+            raise DeviceOperationError(f"CUDA synchronization failed: {exc}") from exc

@@ -1,20 +1,17 @@
-
 """Unit tests for GeneWeaver off-target scoring engine."""
 
 import pytest
 
 from app.engine.device_manager import DeviceManager
-
 from app.engine.hamming import (
     InvalidSequenceError,
     SequenceLengthMismatchError,
 )
-
 from app.engine.off_target import (
-    OffTargetScoringEngine,
     InvalidScoringConfigurationError,
-    score_off_target,
+    OffTargetScoringEngine,
     batch_score_off_targets,
+    score_off_target,
 )
 
 
@@ -122,14 +119,13 @@ def test_batch_scoring(engine):
         ],
     )
 
-    assert [result.mismatch_count for result in results] == [
-        0, 1, 2, 3
-    ]
+    assert [result.mismatch_count for result in results] == [0, 1, 2, 3]
 
-    assert [
-        result.similarity_percent for result in results
-    ] == [
-        100.0, 75.0, 50.0, 25.0
+    assert [result.similarity_percent for result in results] == [
+        100.0,
+        75.0,
+        50.0,
+        25.0,
     ]
 
 
@@ -138,9 +134,7 @@ def test_batch_preserves_target_order(engine):
 
     results = engine.score_batch("ATGC", targets)
 
-    assert [
-        result.target_sequence for result in results
-    ] == targets
+    assert [result.target_sequence for result in results] == targets
 
 
 def test_batch_candidate_classification():
@@ -154,9 +148,7 @@ def test_batch_candidate_classification():
         ["ATGC", "ATGA", "TTTT"],
     )
 
-    assert [result.is_candidate for result in results] == [
-        True, True, False
-    ]
+    assert [result.is_candidate for result in results] == [True, True, False]
 
 
 def test_empty_batch(engine):
@@ -247,9 +239,7 @@ def test_batch_scoring_convenience_function():
         device_manager=DeviceManager(backend="cpu"),
     )
 
-    assert [result.mismatch_count for result in results] == [
-        0, 1, 3
-    ]
+    assert [result.mismatch_count for result in results] == [0, 1, 3]
 
 
 def test_ambiguous_symbols_are_compared_literally(engine):

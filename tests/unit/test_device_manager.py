@@ -1,16 +1,14 @@
-
 """Unit tests for GeneWeaver's adaptive device manager."""
 
 import numpy as np
 import pytest
 
 import app.engine.device_manager as manager_module
-
 from app.engine.device import (
     DeviceInfo,
+    DeviceOperationError,
     DeviceType,
     DeviceUnavailableError,
-    DeviceOperationError,
 )
 
 
@@ -61,9 +59,7 @@ def test_cpu_mode_selects_cpu(monkeypatch):
         FakeCPUBackend,
     )
 
-    manager = manager_module.DeviceManager(
-        backend="cpu"
-    )
+    manager = manager_module.DeviceManager(backend="cpu")
 
     assert manager.backend == "cpu"
     assert manager.device_info.name == "Test CPU"
@@ -76,9 +72,7 @@ def test_auto_mode_selects_cuda_when_available(monkeypatch):
         FakeCUDABackend,
     )
 
-    manager = manager_module.DeviceManager(
-        backend="auto"
-    )
+    manager = manager_module.DeviceManager(backend="auto")
 
     assert manager.backend == "cuda"
     assert manager.device_info.device_id == 0
@@ -92,9 +86,7 @@ def test_auto_mode_falls_back_to_cpu(monkeypatch):
     )
 
     def unavailable_cuda(device_id=0):
-        raise DeviceUnavailableError(
-            "CUDA is unavailable."
-        )
+        raise DeviceUnavailableError("CUDA is unavailable.")
 
     monkeypatch.setattr(
         manager_module,
@@ -102,9 +94,7 @@ def test_auto_mode_falls_back_to_cpu(monkeypatch):
         unavailable_cuda,
     )
 
-    manager = manager_module.DeviceManager(
-        backend="auto"
-    )
+    manager = manager_module.DeviceManager(backend="auto")
 
     assert manager.backend == "cpu"
     assert "CUDA unavailable" in manager.selection_reason
@@ -112,9 +102,7 @@ def test_auto_mode_falls_back_to_cpu(monkeypatch):
 
 def test_explicit_cuda_does_not_fall_back(monkeypatch):
     def unavailable_cuda(device_id=0):
-        raise DeviceUnavailableError(
-            "CUDA is unavailable."
-        )
+        raise DeviceUnavailableError("CUDA is unavailable.")
 
     monkeypatch.setattr(
         manager_module,
@@ -123,16 +111,12 @@ def test_explicit_cuda_does_not_fall_back(monkeypatch):
     )
 
     with pytest.raises(DeviceUnavailableError):
-        manager_module.DeviceManager(
-            backend="cuda"
-        )
+        manager_module.DeviceManager(backend="cuda")
 
 
 def test_invalid_backend_is_rejected():
     with pytest.raises(ValueError):
-        manager_module.DeviceManager(
-            backend="tpu"
-        )
+        manager_module.DeviceManager(backend="tpu")
 
 
 @pytest.mark.parametrize(
@@ -154,9 +138,7 @@ def test_health_check_returns_cpu_information(monkeypatch):
         FakeCPUBackend,
     )
 
-    manager = manager_module.DeviceManager(
-        backend="cpu"
-    )
+    manager = manager_module.DeviceManager(backend="cpu")
 
     health = manager.health_check()
 
@@ -174,9 +156,7 @@ def test_cuda_memory_usage_is_calculated(monkeypatch):
         FakeCUDABackend,
     )
 
-    manager = manager_module.DeviceManager(
-        backend="cuda"
-    )
+    manager = manager_module.DeviceManager(backend="cuda")
 
     assert manager.device_info.used_memory_bytes == 2_000_000
 
@@ -188,9 +168,7 @@ def test_array_module_is_available(monkeypatch):
         FakeCPUBackend,
     )
 
-    manager = manager_module.DeviceManager(
-        backend="cpu"
-    )
+    manager = manager_module.DeviceManager(backend="cpu")
 
     assert manager.array_module is np
 
@@ -202,9 +180,7 @@ def test_synchronize_delegates_to_backend(monkeypatch):
         FakeCPUBackend,
     )
 
-    manager = manager_module.DeviceManager(
-        backend="cpu"
-    )
+    manager = manager_module.DeviceManager(backend="cpu")
 
     manager.synchronize()
 

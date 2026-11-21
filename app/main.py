@@ -1,11 +1,13 @@
 """
-GeneWeaver - Main Application
+GeneWeaver - Main Application.
 
 Creates and configures the FastAPI application.
-Provides a clickable API dashboard and startup endpoint links.
+Provides API dashboard, startup logging,
+database lifecycle management, and endpoint registration.
 """
 
 import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from html import escape
 
@@ -16,6 +18,10 @@ from fastapi.responses import HTMLResponse
 from app.api.v1.endpoints.health import health_check
 from app.api.v1.router import api_router
 from app.core.config import Settings, get_settings
+from app.models.database import (
+    close_database,
+    initialize_database,
+)
 
 logger = logging.getLogger("geneweaver")
 
@@ -32,46 +38,80 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     is_production = app_settings.environment == "production"
 
+    # --------------------------------------------------
     # Application lifecycle
+    # --------------------------------------------------
+
     @asynccontextmanager
-    async def lifespan(application: FastAPI):
+    async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         """Handle application startup and shutdown."""
 
         logger.info("=" * 60)
-        logger.info("GENEWEAVER API SERVER STARTED")
+        logger.info("GENEWEAVER API SERVER STARTING")
         logger.info("Application: %s", app_settings.app_name)
         logger.info("Version: %s", app_settings.app_version)
         logger.info("Environment: %s", app_settings.environment)
-        logger.info("=" * 60)
 
-        # Display available endpoints in terminal
-        logger.info("AVAILABLE API ENDPOINTS:")
-
-        endpoints = [
-            ("API Dashboard", "/"),
-            ("Root Health", "/health"),
-            ("Versioned Health", f"{app_settings.api_prefix}/health"),
-        ]
-
-        if not is_production:
-            endpoints.extend(
-                [
-                    ("Swagger Documentation", "/docs"),
-                    ("ReDoc Documentation", "/redoc"),
-                    ("OpenAPI Schema", "/openapi.json"),
-                ]
+        try:
+            # Initialize database infrastructure
+            await initialize_database(
+                database_url=app_settings.database_url,
+                echo=app_settings.database_echo,
             )
 
-        for name, path in endpoints:
-            logger.info("%-25s http://127.0.0.1:8000%s", name, path)
+            logger.info("Database infrastructure initialized.")
 
-        logger.info("=" * 60)
+            # --------------------------------------------------
+            # Display available API endpoints
+            # --------------------------------------------------
 
-        yield
+            logger.info("=" * 60)
+            logger.info("AVAILABLE API ENDPOINTS:")
 
-        logger.info("GeneWeaver application shutting down.")
+            endpoints = [
+                ("API Dashboard", "/"),
+                ("Root Health", "/health"),
+                (
+                    "Versioned Health",
+                    f"{app_settings.api_prefix}/health",
+                ),
+            ]
 
+            if not is_production:
+                endpoints.extend(
+                    [
+                        ("Swagger Documentation", "/docs"),
+                        ("ReDoc Documentation", "/redoc"),
+                        ("OpenAPI Schema", "/openapi.json"),
+                    ]
+                )
+
+            for name, path in endpoints:
+                logger.info(
+                    "%-25s http://127.0.0.1:8000%s",
+                    name,
+                    path,
+                )
+
+            logger.info("=" * 60)
+
+            yield
+
+        finally:
+            # Release database resources during shutdown
+            try:
+                await close_database()
+                logger.info("Database resources released.")
+            except Exception:
+                logger.exception("Failed to release database resources.")
+                raise
+            finally:
+                logger.info("GeneWeaver application shutting down.")
+
+    # --------------------------------------------------
     # Create FastAPI instance
+    # --------------------------------------------------
+
     application = FastAPI(
         title=app_settings.app_name,
         description=(
@@ -89,7 +129,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Make settings accessible throughout the application
     application.state.settings = app_settings
 
+    # --------------------------------------------------
     # Configure CORS
+    # --------------------------------------------------
+
     application.add_middleware(
         CORSMiddleware,
         allow_origins=app_settings.cors_origins,
@@ -109,13 +152,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ],
     )
 
+    # --------------------------------------------------
     # Register versioned API endpoints
+    # --------------------------------------------------
+
     application.include_router(
         api_router,
         prefix=app_settings.api_prefix,
     )
 
+    # --------------------------------------------------
     # Root health endpoint
+    # --------------------------------------------------
+
     application.add_api_route(
         "/health",
         health_check,
@@ -124,14 +173,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         include_in_schema=False,
     )
 
-    # API dashboard with clickable links
+    # --------------------------------------------------
+    # API dashboard
+    # --------------------------------------------------
+
     @application.get(
         "/",
         response_class=HTMLResponse,
         tags=["Root"],
         include_in_schema=False,
     )
-    async def root(request: Request):
+    async def root(request: Request) -> HTMLResponse:
         """Display all available GeneWeaver API links."""
 
         base_url = str(request.base_url).rstrip("/")
@@ -149,9 +201,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if not is_production:
             endpoints.extend(
                 [
-                    ("Swagger UI", "/docs", "Interactive API documentation"),
-                    ("ReDoc", "/redoc", "Alternative API documentation"),
-                    ("OpenAPI JSON", "/openapi.json", "API specification"),
+                    (
+                        "Swagger UI",
+                        "/docs",
+                        "Interactive API documentation",
+                    ),
+                    (
+                        "ReDoc",
+                        "/redoc",
+                        "Alternative API documentation",
+                    ),
+                    (
+                        "OpenAPI JSON",
+                        "/openapi.json",
+                        "API specification",
+                    ),
                 ]
             )
 
@@ -167,18 +231,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 <div class="endpoint">
                     <div class="endpoint-name">{safe_name}</div>
                     <div class="description">{safe_description}</div>
-                    <a href="{safe_path}" target="_blank" rel="noopener noreferrer">
+                    <a href="{safe_path}" target="_blank"
+                       rel="noopener noreferrer">
                         {escape(full_url)}
                     </a>
                 </div>
             """
 
-        return f"""
+        dashboard_html = f"""
         <!DOCTYPE html>
         <html lang="en">
         <head>
             <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <meta name="viewport"
+                  content="width=device-width, initial-scale=1.0">
+
             <title>GeneWeaver API Dashboard</title>
 
             <style>
@@ -253,7 +320,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 <h1>GeneWeaver API</h1>
 
                 <p class="status">
-                    ● Application is running successfully
+                    Application is running successfully
                 </p>
 
                 <p>
@@ -275,6 +342,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         </html>
         """
 
+        return HTMLResponse(content=dashboard_html)
+
     logger.info(
         "%s application configured successfully",
         app_settings.app_name,
@@ -283,5 +352,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     return application
 
 
+# --------------------------------------------------
 # Main application instance
+# --------------------------------------------------
+
 app = create_app()

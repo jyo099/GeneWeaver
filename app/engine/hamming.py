@@ -1,4 +1,3 @@
-
 """Vectorized Hamming distance engine for GeneWeaver."""
 
 from __future__ import annotations
@@ -9,15 +8,14 @@ import numpy as np
 
 from app.engine.device_manager import DeviceManager
 
-
 # Standard DNA IUPAC nucleotide symbols.
-VALID_DNA_SYMBOLS = frozenset(
-    "ACGTRYSWKMBDHVN"
-)
+VALID_DNA_SYMBOLS = frozenset("ACGTRYSWKMBDHVN")
 
-DNA_NORMALIZATION = str.maketrans({
-    "U": "T",
-})
+DNA_NORMALIZATION = str.maketrans(
+    {
+        "U": "T",
+    }
+)
 
 
 class HammingDistanceError(ValueError):
@@ -69,19 +67,14 @@ class HammingDistanceEngine:
         """
 
         if not isinstance(sequence, str):
-            raise InvalidSequenceError(
-                "DNA sequence must be a string."
-            )
+            raise InvalidSequenceError("DNA sequence must be a string.")
 
-        normalized = sequence.upper().translate(
-            DNA_NORMALIZATION
-        )
+        normalized = sequence.upper().translate(DNA_NORMALIZATION)
 
         for position, symbol in enumerate(normalized):
             if symbol not in VALID_DNA_SYMBOLS:
                 raise InvalidSequenceError(
-                    f"Invalid DNA symbol '{symbol}' "
-                    f"at position {position}."
+                    f"Invalid DNA symbol '{symbol}' at position {position}."
                 )
 
         return normalized
@@ -138,9 +131,7 @@ class HammingDistanceEngine:
         second_array = self._xp.asarray(second_array)
 
         # Vectorized element-wise comparison.
-        mismatch_count = self._xp.count_nonzero(
-            first_array != second_array
-        )
+        mismatch_count = self._xp.count_nonzero(first_array != second_array)
 
         self.device_manager.synchronize()
 
@@ -166,14 +157,10 @@ class HammingDistanceEngine:
 
         if isinstance(targets, (str, bytes)):
             raise InvalidSequenceError(
-                "Targets must be a sequence of DNA strings, "
-                "not a single string."
+                "Targets must be a sequence of DNA strings, not a single string."
             )
 
-        normalized_targets = [
-            self.normalize_sequence(target)
-            for target in targets
-        ]
+        normalized_targets = [self.normalize_sequence(target) for target in targets]
 
         if not normalized_targets:
             return []
@@ -198,10 +185,7 @@ class HammingDistanceEngine:
 
         # Build a contiguous matrix of target sequences.
         target_matrix = np.frombuffer(
-            b"".join(
-                target.encode("ascii")
-                for target in normalized_targets
-            ),
+            b"".join(target.encode("ascii") for target in normalized_targets),
             dtype=np.uint8,
         ).reshape(
             len(normalized_targets),
@@ -213,9 +197,7 @@ class HammingDistanceEngine:
         target_matrix = self._xp.asarray(target_matrix)
 
         # Broadcast query across all target rows.
-        mismatch_matrix = (
-            target_matrix != query_array[None, :]
-        )
+        mismatch_matrix = target_matrix != query_array[None, :]
 
         # Count mismatches independently for each target.
         distances = self._xp.count_nonzero(

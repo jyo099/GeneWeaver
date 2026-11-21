@@ -1,17 +1,15 @@
-
 """Unit tests for GeneWeaver Hamming distance engine."""
 
 import numpy as np
 import pytest
 
 from app.engine.device_manager import DeviceManager
-
 from app.engine.hamming import (
     HammingDistanceEngine,
     InvalidSequenceError,
     SequenceLengthMismatchError,
-    hamming_distance,
     batch_hamming_distance,
+    hamming_distance,
 )
 
 
@@ -21,51 +19,67 @@ def engine():
 
     manager = DeviceManager(backend="cpu")
 
-    return HammingDistanceEngine(
-        device_manager=manager
-    )
+    return HammingDistanceEngine(device_manager=manager)
 
 
 def test_identical_sequences(engine):
-    assert engine.compute(
-        "ATGC",
-        "ATGC",
-    ) == 0
+    assert (
+        engine.compute(
+            "ATGC",
+            "ATGC",
+        )
+        == 0
+    )
 
 
 def test_single_mismatch(engine):
-    assert engine.compute(
-        "ATGC",
-        "ATGA",
-    ) == 1
+    assert (
+        engine.compute(
+            "ATGC",
+            "ATGA",
+        )
+        == 1
+    )
 
 
 def test_multiple_mismatches(engine):
-    assert engine.compute(
-        "ATGCAG",
-        "ATACTG",
-    ) == 2
+    assert (
+        engine.compute(
+            "ATGCAG",
+            "ATACTG",
+        )
+        == 2
+    )
 
 
 def test_case_insensitive_comparison(engine):
-    assert engine.compute(
-        "atgc",
-        "ATGC",
-    ) == 0
+    assert (
+        engine.compute(
+            "atgc",
+            "ATGC",
+        )
+        == 0
+    )
 
 
 def test_rna_uracil_normalized_to_thymine(engine):
-    assert engine.compute(
-        "AUGC",
-        "ATGC",
-    ) == 0
+    assert (
+        engine.compute(
+            "AUGC",
+            "ATGC",
+        )
+        == 0
+    )
 
 
 def test_ambiguous_symbols_are_compared_literally(engine):
-    assert engine.compute(
-        "ARN",
-        "AGN",
-    ) == 1
+    assert (
+        engine.compute(
+            "ARN",
+            "AGN",
+        )
+        == 1
+    )
 
 
 def test_empty_sequences(engine):
@@ -125,10 +139,13 @@ def test_batch_hamming_distance(engine):
 
 
 def test_batch_with_empty_targets(engine):
-    assert engine.compute_batch(
-        "ATGC",
-        [],
-    ) == []
+    assert (
+        engine.compute_batch(
+            "ATGC",
+            [],
+        )
+        == []
+    )
 
 
 def test_batch_with_empty_sequences(engine):
@@ -163,11 +180,14 @@ def test_batch_rejects_single_string_as_targets(engine):
 
 
 def test_convenience_function():
-    assert hamming_distance(
-        "ATGC",
-        "ATGA",
-        DeviceManager(backend="cpu"),
-    ) == 1
+    assert (
+        hamming_distance(
+            "ATGC",
+            "ATGA",
+            DeviceManager(backend="cpu"),
+        )
+        == 1
+    )
 
 
 def test_batch_convenience_function():
@@ -201,7 +221,10 @@ def test_large_batch(engine):
 
 
 def test_ambiguous_symbols_are_valid(engine):
-    assert engine.compute(
-        "ACGTRYSWKMBDHVN",
-        "ACGTRYSWKMBDHVN",
-    ) == 0
+    assert (
+        engine.compute(
+            "ACGTRYSWKMBDHVN",
+            "ACGTRYSWKMBDHVN",
+        )
+        == 0
+    )

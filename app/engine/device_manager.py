@@ -1,9 +1,8 @@
-
 """Adaptive CPU/GPU device manager for GeneWeaver."""
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, ClassVar, Literal
 
 from app.engine.backend import CPUBackend, CUDABackend
 from app.engine.device import (
@@ -11,7 +10,6 @@ from app.engine.device import (
     DeviceInfo,
     DeviceManagerError,
 )
-
 
 BackendName = Literal["auto", "cpu", "cuda"]
 
@@ -40,7 +38,11 @@ class DeviceManager:
         Require CUDA. Never silently fall back to CPU.
     """
 
-    VALID_BACKENDS = {"auto", "cpu", "cuda"}
+    VALID_BACKENDS: ClassVar[set[str]] = {
+        "auto",
+        "cpu",
+        "cuda",
+    }
 
     def __init__(
         self,
@@ -49,8 +51,7 @@ class DeviceManager:
     ) -> None:
         if backend not in self.VALID_BACKENDS:
             raise ValueError(
-                "Invalid backend. Supported values are "
-                "'auto', 'cpu', and 'cuda'."
+                "Invalid backend. Supported values are 'auto', 'cpu', and 'cuda'."
             )
 
         if (
@@ -58,9 +59,7 @@ class DeviceManager:
             or not isinstance(device_id, int)
             or device_id < 0
         ):
-            raise ValueError(
-                "device_id must be a non-negative integer."
-            )
+            raise ValueError("device_id must be a non-negative integer.")
 
         self.requested_backend = backend
         self.device_id = device_id
@@ -76,39 +75,28 @@ class DeviceManager:
         if self.requested_backend == "cpu":
             self._backend = CPUBackend()
 
-            self._selection_reason = (
-                "CPU explicitly requested."
-            )
+            self._selection_reason = "CPU explicitly requested."
 
             return
 
         if self.requested_backend == "cuda":
-            self._backend = CUDABackend(
-                device_id=self.device_id
-            )
+            self._backend = CUDABackend(device_id=self.device_id)
 
-            self._selection_reason = (
-                "CUDA explicitly requested."
-            )
+            self._selection_reason = "CUDA explicitly requested."
 
             return
 
         # Automatic mode.
         try:
-            self._backend = CUDABackend(
-                device_id=self.device_id
-            )
+            self._backend = CUDABackend(device_id=self.device_id)
 
-            self._selection_reason = (
-                "CUDA is available; selected automatically."
-            )
+            self._selection_reason = "CUDA is available; selected automatically."
 
         except DeviceManagerError as exc:
             self._backend = CPUBackend()
 
             self._selection_reason = (
-                "CUDA unavailable; selected CPU backend. "
-                f"Reason: {exc}"
+                f"CUDA unavailable; selected CPU backend. Reason: {exc}"
             )
 
     @property

@@ -33,3 +33,4 @@ htmlcov/
 .idea/
 # Python package build files
 *.egg-info/
+.ruff_cache/

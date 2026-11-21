@@ -41,7 +41,7 @@ def test_parse_multiple_fasta_records(tmp_path):
     fasta = tmp_path / "multiple.fa"
 
     fasta.write_text(
-        ">gene_001\nATGC\n" ">gene_002\nGCTA\n",
+        ">gene_001\nATGC\n>gene_002\nGCTA\n",
         encoding="utf-8",
     )
 
@@ -58,7 +58,7 @@ def test_parse_fastq_and_quality_scores(tmp_path):
     fastq = tmp_path / "reads.fastq"
 
     fastq.write_text(
-        "@read_001 sample\n" "ATGCGT\n" "+\n" "IIIIII\n",
+        "@read_001 sample\nATGCGT\n+\nIIIIII\n",
         encoding="utf-8",
     )
 

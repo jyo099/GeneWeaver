@@ -7,15 +7,12 @@ from app.main import create_app
 
 
 def create_test_settings() -> Settings:
-    """Create isolated settings for testing."""
-
     return Settings(
         _env_file=None,
         app_name="GeneWeaver Test",
-        app_version="0.1.0",
         environment="testing",
-        debug=False,
-        api_prefix="/api/v1",
+        debug=True,
+        database_url="sqlite+aiosqlite:///:memory:",
         cors_origins=["http://localhost:3000"],
     )
 
@@ -130,6 +127,7 @@ def test_production_disables_api_documentation():
         app_name="GeneWeaver",
         environment="production",
         debug=False,
+        database_url="sqlite+aiosqlite:///:memory:",
     )
 
     application = create_app(production_settings)

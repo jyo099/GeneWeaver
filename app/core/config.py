@@ -1,5 +1,5 @@
 """
-GeneWeaver - Central Application Configuration
+GeneWeaver - Central Application Configuration.
 
 Manages environment variables, database settings, Redis,
 sequence processing limits, and application configuration.
@@ -51,8 +51,10 @@ class Settings(BaseSettings):
     # --------------------------------------------------
 
     database_url: str = (
-        "postgresql+psycopg://geneweaver:change-me" "@localhost:5432/geneweaver"
+        "postgresql+psycopg://geneweaver:change-me@localhost:5432/geneweaver"
     )
+
+    database_echo: bool = False
 
     # --------------------------------------------------
     # Redis configuration
@@ -89,10 +91,18 @@ class Settings(BaseSettings):
 
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
 
+    # --------------------------------------------------
+    # Validators
+    # --------------------------------------------------
+
     @field_validator("app_name", "app_version")
     @classmethod
-    def validate_non_empty_strings(cls, value: str) -> str:
+    def validate_non_empty_strings(
+        cls,
+        value: str,
+    ) -> str:
         """Reject empty application metadata."""
+
         value = value.strip()
 
         if not value:
@@ -102,8 +112,12 @@ class Settings(BaseSettings):
 
     @field_validator("api_prefix")
     @classmethod
-    def validate_api_prefix(cls, value: str) -> str:
+    def validate_api_prefix(
+        cls,
+        value: str,
+    ) -> str:
         """Ensure API prefix starts with a slash."""
+
         value = value.strip()
 
         if not value.startswith("/"):
@@ -118,6 +132,7 @@ class Settings(BaseSettings):
         value: list[str],
     ) -> list[str]:
         """Remove whitespace and reject empty origins."""
+
         origins = [origin.strip() for origin in value]
 
         if any(not origin for origin in origins):
@@ -134,6 +149,7 @@ def get_settings() -> Settings:
     Settings are loaded from environment variables
     and the local .env file.
     """
+
     return Settings()
 
 

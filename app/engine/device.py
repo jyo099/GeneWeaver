@@ -1,4 +1,3 @@
-
 """Core device definitions for GeneWeaver's compute engine."""
 
 from __future__ import annotations
@@ -39,33 +38,23 @@ class DeviceInfo:
             value = getattr(self, field_name)
 
             if value is not None and value < 0:
-                raise ValueError(
-                    f"{field_name} cannot be negative."
-                )
+                raise ValueError(f"{field_name} cannot be negative.")
 
         if (
             self.total_memory_bytes is not None
             and self.free_memory_bytes is not None
             and self.free_memory_bytes > self.total_memory_bytes
         ):
-            raise ValueError(
-                "Free memory cannot exceed total memory."
-            )
+            raise ValueError("Free memory cannot exceed total memory.")
 
     @property
     def used_memory_bytes(self) -> int | None:
         """Return used device memory, if memory data is available."""
 
-        if (
-            self.total_memory_bytes is None
-            or self.free_memory_bytes is None
-        ):
+        if self.total_memory_bytes is None or self.free_memory_bytes is None:
             return None
 
-        return (
-            self.total_memory_bytes
-            - self.free_memory_bytes
-        )
+        return self.total_memory_bytes - self.free_memory_bytes
 
 
 class DeviceManagerError(RuntimeError):

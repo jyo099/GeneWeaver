@@ -1,4 +1,3 @@
-
 """Interpretable sequence-based off-target scoring for GeneWeaver."""
 
 from __future__ import annotations
@@ -71,22 +70,18 @@ class OffTargetScoringEngine:
         device_manager: DeviceManager | None = None,
         max_mismatches: int | None = None,
     ) -> None:
-        if max_mismatches is not None:
-            if (
-                isinstance(max_mismatches, bool)
-                or not isinstance(max_mismatches, int)
-                or max_mismatches < 0
-            ):
-                raise InvalidScoringConfigurationError(
-                    "max_mismatches must be a non-negative integer "
-                    "or None."
-                )
+        if max_mismatches is not None and (
+            isinstance(max_mismatches, bool)
+            or not isinstance(max_mismatches, int)
+            or max_mismatches < 0
+        ):
+            raise InvalidScoringConfigurationError(
+                "max_mismatches must be a non-negative integer or None."
+            )
 
         self.max_mismatches = max_mismatches
 
-        self._hamming_engine = HammingDistanceEngine(
-            device_manager=device_manager
-        )
+        self._hamming_engine = HammingDistanceEngine(device_manager=device_manager)
 
     @staticmethod
     def _validate_non_empty_sequence(
@@ -95,14 +90,10 @@ class OffTargetScoringEngine:
     ) -> str:
         """Normalize and validate a non-empty DNA sequence."""
 
-        normalized = HammingDistanceEngine.normalize_sequence(
-            sequence
-        )
+        normalized = HammingDistanceEngine.normalize_sequence(sequence)
 
         if not normalized:
-            raise InvalidSequenceError(
-                f"{field_name} cannot be empty."
-            )
+            raise InvalidSequenceError(f"{field_name} cannot be empty.")
 
         return normalized
 
@@ -115,8 +106,7 @@ class OffTargetScoringEngine:
 
         return tuple(
             index
-            for index, (query_base, target_base)
-            in enumerate(zip(query, target))
+            for index, (query_base, target_base) in enumerate(zip(query, target))
             if query_base != target_base
         )
 
@@ -157,8 +147,7 @@ class OffTargetScoringEngine:
         sequence_length = len(normalized_query)
 
         similarity_percent = (
-            (sequence_length - mismatch_count)
-            / sequence_length
+            (sequence_length - mismatch_count) / sequence_length
         ) * 100.0
 
         is_candidate = (
@@ -198,8 +187,7 @@ class OffTargetScoringEngine:
 
         if isinstance(targets, (str, bytes)):
             raise InvalidSequenceError(
-                "Targets must be a collection of DNA strings, "
-                "not a single string."
+                "Targets must be a collection of DNA strings, not a single string."
             )
 
         normalized_targets = [
@@ -241,8 +229,7 @@ class OffTargetScoringEngine:
             sequence_length = len(normalized_query)
 
             similarity_percent = (
-                (sequence_length - mismatch_count)
-                / sequence_length
+                (sequence_length - mismatch_count) / sequence_length
             ) * 100.0
 
             is_candidate = (

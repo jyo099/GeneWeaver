@@ -107,8 +107,7 @@ def validate_sequence(
 
     if invalid_bases:
         raise InvalidNucleotideError(
-            f"Invalid {molecule_type} nucleotide symbols: "
-            f"{', '.join(invalid_bases)}"
+            f"Invalid {molecule_type} nucleotide symbols: {', '.join(invalid_bases)}"
         )
 
     return normalized
@@ -126,7 +125,6 @@ def _parse_handle(
 
     try:
         for record in SeqIO.parse(handle, file_format):
-
             sequence = validate_sequence(
                 str(record.seq),
                 molecule_type,
@@ -140,12 +138,12 @@ def _parse_handle(
 
                 if scores is None:
                     raise SequenceParseError(
-                        f"Missing FASTQ quality scores for " f"record {record.id}."
+                        f"Missing FASTQ quality scores for record {record.id}."
                     )
 
                 if len(scores) != len(sequence):
                     raise SequenceParseError(
-                        f"Quality score length mismatch for " f"record {record.id}."
+                        f"Quality score length mismatch for record {record.id}."
                     )
 
                 quality_scores = tuple(scores)
