@@ -26,6 +26,14 @@ from app.engine.hamming import (
     hamming_distance,
     batch_hamming_distance,
 )
+from app.engine.off_target import (
+    OffTargetResult,
+    OffTargetScoringEngine,
+    OffTargetScoringError,
+    InvalidScoringConfigurationError,
+    score_off_target,
+    batch_score_off_targets,
+)
 
 __all__ = [
     "ComputeBackend",
@@ -44,4 +52,10 @@ __all__ = [
     "SequenceLengthMismatchError",
     "hamming_distance",
     "batch_hamming_distance",
+    "OffTargetResult",
+    "OffTargetScoringEngine",
+    "OffTargetScoringError",
+    "InvalidScoringConfigurationError",
+    "score_off_target",
+    "batch_score_off_targets",
 ]
