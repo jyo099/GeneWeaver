@@ -1,101 +1,84 @@
 
 # Reference Genome Cache
 
-GeneWeaver uses Redis as an optional performance layer for reference-genome
-sequences. PostgreSQL and the reference-data source remain authoritative.
+GeneWeaver uses Redis as an optional cache for immutable reference-genome
+sequence chunks.
 
-## Installation
+## Cache identity
 
-Install the existing cache dependency group:
+Each entry is identified by:
 
-```powershell
-pip install -e ".[cache,dev]"
-```
+- Genome identifier
+- Exact reference dataset version
+- Chunk index
+- Cache schema version
 
-The cache group includes Redis and Celery. This commit uses Redis; Celery
-will be integrated in the background-worker milestone.
-
-## Configuration
-
-Set the Redis connection URL through the existing `GW_` environment prefix:
-
-```env
-GW_REDIS_URL=redis://localhost:6379/0
-```
-
-The default cache expiration is 86,400 seconds (24 hours). It can be
-overridden per write.
+A different genome version always produces a different cache key.
 
 ## Usage
 
 ```python
-from app.core.config import get_settings
-from app.services.cache import ReferenceGenomeCache
+from app.services.cache import RedisGenomeCache
 
-
-cache = ReferenceGenomeCache.from_url(
-    get_settings().redis_url,
-    ttl_seconds=86_400,
-)
+cache = RedisGenomeCache.from_settings()
 
 try:
-    sequence = await cache.get_reference_genome(
+    sequence = await cache.get_chunk(
         genome_id="GRCh38",
-        dataset_version="2026.1",
+        genome_version="release-1",
+        chunk_index=0,
     )
 
     if sequence is None:
-        # Load the sequence from the authoritative reference-data source.
-        sequence = await reference_repository.load_sequence(
+        # Load the authoritative sequence chunk from the genome store.
+        sequence = await genome_store.load_chunk(
             genome_id="GRCh38",
-            dataset_version="2026.1",
+            version="release-1",
+            chunk_index=0,
         )
 
-        await cache.set_reference_genome(
+        await cache.set_chunk(
             genome_id="GRCh38",
-            dataset_version="2026.1",
+            genome_version="release-1",
+            chunk_index=0,
             sequence=sequence,
         )
 finally:
     await cache.close()
 ```
 
-`reference_repository` above represents the application's authoritative
-reference-data loader; it is not introduced by this cache commit.
+The `genome_store` above represents the authoritative genome storage
+service. It must be implemented by the reference-genome management
+milestone; the cache must never become the authoritative source.
 
-## Cache key strategy
+## Invalidation
 
-Keys follow this structure:
+When a reference dataset version is retired or its cached entries must
+be removed:
 
-```text
-geneweaver:reference-genome:{genome_id}:{dataset_version}
+```python
+deleted = await cache.invalidate_genome(
+    genome_id="GRCh38",
+    genome_version="release-1",
+)
 ```
 
-The genome identifier and dataset version are URL-escaped before being
-placed in the key. Including the dataset version prevents a newer reference
-dataset from accidentally reading an older cached sequence.
+Only the specified genome and version are invalidated.
 
 ## Failure behavior
 
-- Cache hit: return the cached sequence.
-- Cache miss: return `None`; the caller loads the authoritative sequence.
-- Redis read failure: log a warning and return `None`.
-- Redis write/delete failure: log a warning and return `False`.
-- Cache expiration: Redis automatically expires the entry.
+Redis connection failures are treated as cache misses for reads and
+unsuccessful cache writes. Callers must continue using the authoritative
+genome store.
 
-Redis is an optimization, not the source of truth. Callers must always be
-able to load reference data without a cache hit.
+Malformed cache entries are deleted and treated as misses.
 
-## Tests
+## Operational notes
 
-Run the cache tests without a Redis server:
-
-```powershell
-pytest tests/unit/test_cache.py -v
-```
-
-Run the complete suite:
-
-```powershell
-pytest -v
-```
+- Default TTL: 24 hours.
+- Maximum configurable TTL: 30 days.
+- Cache keys contain SHA-256 hashes of genome identifiers and versions.
+- Sequence chunks are stored independently.
+- Redis must be monitored and protected by network access controls.
+- Never store authentication secrets or sensitive user data in genome keys.
+- Cache schema changes require a schema-version update.

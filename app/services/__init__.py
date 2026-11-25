@@ -1,5 +1,5 @@
 """GeneWeaver application services."""
 
-from app.services.cache import ReferenceGenomeCache
+from app.services.cache import RedisGenomeCache
 
-__all__ = ["ReferenceGenomeCache"]
+__all__ = ["RedisGenomeCache"]

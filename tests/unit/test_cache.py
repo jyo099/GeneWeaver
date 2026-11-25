@@ -1,218 +1,264 @@
-"""Unit tests for the Redis reference genome cache."""
+"""Unit tests for the Redis reference-genome cache."""
 
-from unittest.mock import AsyncMock, patch
+import json
 
 import pytest
 from redis.exceptions import RedisError
 
-from app.services.cache import ReferenceGenomeCache
+from app.services.cache import RedisGenomeCache
+
+
+class FakeRedis:
+    """Small asynchronous Redis substitute for unit testing."""
+
+    def __init__(self):
+        self.data = {}
+        self.ttls = {}
+        self.fail_reads = False
+        self.fail_writes = False
+        self.fail_ping = False
+        self.closed = False
+
+    async def get(self, key):
+        if self.fail_reads:
+            raise RedisError("Redis unavailable")
+        return self.data.get(key)
+
+    async def set(self, key, value, ex=None):
+        if self.fail_writes:
+            raise RedisError("Redis unavailable")
+        self.data[key] = value
+        self.ttls[key] = ex
+        return True
+
+    async def delete(self, *keys):
+        deleted = 0
+        for key in keys:
+            if key in self.data:
+                del self.data[key]
+                self.ttls.pop(key, None)
+                deleted += 1
+        return deleted
+
+    async def scan_iter(self, match=None, count=500):
+        del count
+        import fnmatch
+
+        for key in list(self.data):
+            if match is None or fnmatch.fnmatch(key, match):
+                yield key
+
+    async def ping(self):
+        if self.fail_ping:
+            raise RedisError("Redis unavailable")
+        return True
+
+    async def aclose(self):
+        self.closed = True
 
 
 @pytest.fixture
 def redis_client():
-    """Provide an isolated asynchronous Redis mock."""
-    client = AsyncMock()
-    return client
+    return FakeRedis()
 
 
 @pytest.fixture
 def cache(redis_client):
-    """Create a cache using the mocked Redis client."""
-    return ReferenceGenomeCache(
+    return RedisGenomeCache(
         redis_client,
         ttl_seconds=3600,
     )
 
 
 @pytest.mark.asyncio
-async def test_cache_hit_returns_reference_sequence(cache, redis_client):
-    redis_client.get.return_value = "ACGTACGT"
+async def test_set_and_get_genome_chunk(cache):
+    sequence = "ACGTACGTACGT"
 
-    result = await cache.get_reference_genome("GRCh38", "v1")
+    stored = await cache.set_chunk(
+        "GRCh38",
+        "release-1",
+        0,
+        sequence,
+    )
+    retrieved = await cache.get_chunk(
+        "GRCh38",
+        "release-1",
+        0,
+    )
 
-    assert result == "ACGTACGT"
-    redis_client.get.assert_awaited_once_with("geneweaver:reference-genome:GRCh38:v1")
+    assert stored is True
+    assert retrieved == sequence
 
 
 @pytest.mark.asyncio
-async def test_cache_miss_returns_none(cache, redis_client):
-    redis_client.get.return_value = None
-
-    result = await cache.get_reference_genome("GRCh38", "v1")
+async def test_cache_miss_returns_none(cache):
+    result = await cache.get_chunk(
+        "GRCh38",
+        "release-1",
+        0,
+    )
 
     assert result is None
 
 
 @pytest.mark.asyncio
-async def test_set_reference_genome_uses_default_ttl(cache, redis_client):
-    result = await cache.set_reference_genome(
-        "GRCh38",
-        "v1",
-        "ACGTACGT",
-    )
+async def test_genome_versions_have_separate_cache_entries(cache):
+    await cache.set_chunk("GRCh38", "release-1", 0, "AAAA")
+    await cache.set_chunk("GRCh38", "release-2", 0, "CCCC")
 
-    assert result is True
-    redis_client.set.assert_awaited_once_with(
-        "geneweaver:reference-genome:GRCh38:v1",
-        "ACGTACGT",
-        ex=3600,
-    )
+    first = await cache.get_chunk("GRCh38", "release-1", 0)
+    second = await cache.get_chunk("GRCh38", "release-2", 0)
+
+    assert first == "AAAA"
+    assert second == "CCCC"
 
 
 @pytest.mark.asyncio
-async def test_set_reference_genome_supports_custom_ttl(
-    cache,
-    redis_client,
-):
-    result = await cache.set_reference_genome(
+async def test_different_genomes_have_separate_cache_entries(cache):
+    await cache.set_chunk("GRCh38", "release-1", 0, "AAAA")
+    await cache.set_chunk("GRCh37", "release-1", 0, "CCCC")
+
+    assert await cache.get_chunk("GRCh38", "release-1", 0) == "AAAA"
+    assert await cache.get_chunk("GRCh37", "release-1", 0) == "CCCC"
+
+
+@pytest.mark.asyncio
+async def test_chunks_are_independent(cache):
+    await cache.set_chunk("GRCh38", "release-1", 0, "AAAA")
+    await cache.set_chunk("GRCh38", "release-1", 1, "CCCC")
+
+    assert await cache.get_chunk("GRCh38", "release-1", 0) == "AAAA"
+    assert await cache.get_chunk("GRCh38", "release-1", 1) == "CCCC"
+
+
+@pytest.mark.asyncio
+async def test_ttl_is_applied(redis_client, cache):
+    await cache.set_chunk("GRCh38", "release-1", 0, "AAAA")
+
+    key = next(iter(redis_client.data))
+    assert redis_client.ttls[key] == 3600
+
+
+@pytest.mark.asyncio
+async def test_custom_ttl_is_applied(redis_client, cache):
+    await cache.set_chunk(
         "GRCh38",
-        "v1",
-        "ACGT",
+        "release-1",
+        0,
+        "AAAA",
         ttl_seconds=120,
     )
 
-    assert result is True
-    assert redis_client.set.await_args.kwargs["ex"] == 120
+    key = next(iter(redis_client.data))
+    assert redis_client.ttls[key] == 120
 
 
 @pytest.mark.asyncio
-async def test_dataset_versions_use_separate_cache_keys(
-    cache,
-    redis_client,
-):
-    await cache.get_reference_genome("GRCh38", "v1")
-    await cache.get_reference_genome("GRCh38", "v2")
-
-    assert redis_client.get.await_args_list[0].args[0].endswith(":v1")
-    assert redis_client.get.await_args_list[1].args[0].endswith(":v2")
-
-
-@pytest.mark.asyncio
-async def test_genome_identifiers_are_escaped(cache, redis_client):
-    await cache.get_reference_genome("reference/a", "release 1")
-
-    redis_client.get.assert_awaited_once_with(
-        "geneweaver:reference-genome:reference%2Fa:release%201"
-    )
+async def test_invalid_ttl_is_rejected(cache):
+    with pytest.raises(ValueError):
+        await cache.set_chunk(
+            "GRCh38",
+            "release-1",
+            0,
+            "AAAA",
+            ttl_seconds=0,
+        )
 
 
 @pytest.mark.asyncio
-async def test_redis_read_failure_fails_open(cache, redis_client):
-    redis_client.get.side_effect = RedisError("Redis unavailable")
+async def test_empty_sequence_is_rejected(cache):
+    with pytest.raises(ValueError):
+        await cache.set_chunk(
+            "GRCh38",
+            "release-1",
+            0,
+            "",
+        )
 
-    result = await cache.get_reference_genome("GRCh38", "v1")
+
+@pytest.mark.asyncio
+async def test_negative_chunk_index_is_rejected(cache):
+    with pytest.raises(ValueError):
+        await cache.get_chunk("GRCh38", "release-1", -1)
+
+
+@pytest.mark.asyncio
+async def test_empty_genome_id_is_rejected(cache):
+    with pytest.raises(ValueError):
+        await cache.get_chunk("", "release-1", 0)
+
+
+@pytest.mark.asyncio
+async def test_redis_read_failure_returns_cache_miss(cache, redis_client):
+    redis_client.fail_reads = True
+
+    result = await cache.get_chunk("GRCh38", "release-1", 0)
 
     assert result is None
 
 
 @pytest.mark.asyncio
-async def test_redis_write_failure_does_not_break_processing(
-    cache,
-    redis_client,
-):
-    redis_client.set.side_effect = RedisError("Redis unavailable")
+async def test_redis_write_failure_returns_false(cache, redis_client):
+    redis_client.fail_writes = True
 
-    result = await cache.set_reference_genome(
+    result = await cache.set_chunk(
         "GRCh38",
-        "v1",
-        "ACGT",
+        "release-1",
+        0,
+        "AAAA",
     )
 
     assert result is False
 
 
 @pytest.mark.asyncio
-async def test_delete_reference_genome(cache, redis_client):
-    redis_client.delete.return_value = 1
+async def test_invalid_payload_is_deleted(cache, redis_client):
+    key = cache._key("GRCh38", "release-1", 0)
+    redis_client.data[key] = json.dumps({"schema": "unknown", "sequence": "AAAA"})
 
-    result = await cache.delete_reference_genome("GRCh38", "v1")
+    result = await cache.get_chunk("GRCh38", "release-1", 0)
 
-    assert result is True
-    redis_client.delete.assert_awaited_once_with(
-        "geneweaver:reference-genome:GRCh38:v1"
+    assert result is None
+    assert key not in redis_client.data
+
+
+@pytest.mark.asyncio
+async def test_invalidate_one_genome_version(cache):
+    await cache.set_chunk("GRCh38", "release-1", 0, "AAAA")
+    await cache.set_chunk("GRCh38", "release-1", 1, "CCCC")
+    await cache.set_chunk("GRCh38", "release-2", 0, "GGGG")
+    await cache.set_chunk("GRCh37", "release-1", 0, "TTTT")
+
+    deleted = await cache.invalidate_genome(
+        "GRCh38",
+        "release-1",
     )
 
-
-@pytest.mark.asyncio
-async def test_delete_missing_key_returns_false(cache, redis_client):
-    redis_client.delete.return_value = 0
-
-    result = await cache.delete_reference_genome("GRCh38", "v1")
-
-    assert result is False
+    assert deleted == 2
+    assert await cache.get_chunk("GRCh38", "release-1", 0) is None
+    assert await cache.get_chunk("GRCh38", "release-2", 0) == "GGGG"
+    assert await cache.get_chunk("GRCh37", "release-1", 0) == "TTTT"
 
 
 @pytest.mark.asyncio
-async def test_redis_delete_failure_fails_open(cache, redis_client):
-    redis_client.delete.side_effect = RedisError("Redis unavailable")
+async def test_health_check(cache):
+    assert await cache.health_check() is True
 
-    result = await cache.delete_reference_genome("GRCh38", "v1")
 
-    assert result is False
+@pytest.mark.asyncio
+async def test_health_check_handles_redis_failure(cache, redis_client):
+    redis_client.fail_ping = True
+
+    assert await cache.health_check() is False
 
 
 @pytest.mark.asyncio
 async def test_close_closes_redis_client(cache, redis_client):
     await cache.close()
 
-    redis_client.aclose.assert_awaited_once()
+    assert redis_client.closed is True
 
 
-@pytest.mark.asyncio
-async def test_from_url_creates_async_redis_client(redis_client):
-    with patch(
-        "app.services.cache.Redis.from_url",
-        return_value=redis_client,
-    ) as redis_factory:
-        cache = ReferenceGenomeCache.from_url(
-            "redis://localhost:6379/0",
-            ttl_seconds=600,
-        )
-
-    redis_factory.assert_called_once_with(
-        "redis://localhost:6379/0",
-        decode_responses=True,
-        socket_connect_timeout=2,
-        socket_timeout=2,
-        health_check_interval=30,
-    )
-    assert cache._client is redis_client
-
-
-def test_rejects_non_positive_default_ttl(redis_client):
-    with pytest.raises(ValueError, match="ttl_seconds"):
-        ReferenceGenomeCache(redis_client, ttl_seconds=0)
-
-
-def test_rejects_empty_key_prefix(redis_client):
-    with pytest.raises(ValueError, match="key_prefix"):
-        ReferenceGenomeCache(redis_client, key_prefix=" ")
-
-
-@pytest.mark.asyncio
-async def test_rejects_empty_sequence(cache):
-    with pytest.raises(ValueError, match="sequence"):
-        await cache.set_reference_genome("GRCh38", "v1", "")
-
-
-@pytest.mark.asyncio
-async def test_rejects_non_positive_custom_ttl(cache):
-    with pytest.raises(ValueError, match="ttl_seconds"):
-        await cache.set_reference_genome(
-            "GRCh38",
-            "v1",
-            "ACGT",
-            ttl_seconds=0,
-        )
-
-
-@pytest.mark.asyncio
-async def test_rejects_empty_genome_identifier(cache):
-    with pytest.raises(ValueError, match="genome_id"):
-        await cache.get_reference_genome(" ", "v1")
-
-
-@pytest.mark.asyncio
-async def test_rejects_empty_dataset_version(cache):
-    with pytest.raises(ValueError, match="dataset_version"):
-        await cache.get_reference_genome("GRCh38", " ")
+def test_invalid_default_ttl_is_rejected(redis_client):
+    with pytest.raises(ValueError):
+        RedisGenomeCache(redis_client, ttl_seconds=0)
